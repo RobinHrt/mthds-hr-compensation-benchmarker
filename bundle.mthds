@@ -1,0 +1,138 @@
+domain    = "hr_compensation_benchmarker"
+description = "Analyze compensation against market benchmarks and pay equity, producing actionable recommendations for CHRO and CFO"
+main_pipe = "compensation_benchmarking"
+
+[concept.MarketAnalysis]
+description = "Market positioning analysis across role families"
+
+[concept.MarketAnalysis.structure]
+role_analyses = { type = "text", description = "Per role family: role, level, location, internal median, market percentiles, market position, compa-ratio, employee count, out-of-band count", required = true }
+at_risk_roles = { type = "text", description = "Roles most at risk of attrition (below market + high demand)", required = true }
+band_adjustment_recommendations = { type = "text", description = "Recommended salary band adjustments", required = true }
+
+[concept.PayEquityAnalysis]
+description = "Pay equity analysis across demographic dimensions"
+
+[concept.PayEquityAnalysis.structure]
+demographic_findings = { type = "text", description = "Per demographic dimension: median compa-ratio comparison, statistical significance, affected roles, estimated cost to close gap", required = true }
+significant_gaps     = { type = "text", description = "Gaps flagged as statistically significant with estimated remediation cost", required = true }
+methodology_notes    = { type = "text", description = "Methodology used for the pay equity analysis" }
+
+[concept.CompensationReport]
+description = "Comprehensive compensation benchmarking and pay equity report"
+
+[concept.CompensationReport.structure]
+overall_competitiveness = { choices = ["leading", "competitive", "lagging", "at risk"], description = "Overall market competitiveness assessment", required = true }
+at_risk_roles           = { type = "text", description = "Roles most at risk of attrition", required = true }
+pay_equity_summary      = { type = "text", description = "Pay equity findings with flagged gaps", required = true }
+band_adjustments        = { type = "text", description = "Recommended band adjustments", required = true }
+total_budget_impact     = { type = "text", description = "Total estimated budget impact of all recommended adjustments", required = true }
+executive_summary       = { type = "text", description = "Executive summary for CHRO and CFO", required = true }
+
+# --- Pipes ---
+
+[pipe.compensation_benchmarking]
+type        = "PipeSequence"
+description = "Analyze compensation against market and equity, then compile recommendations"
+inputs      = { employee_comp_data = "Text", market_benchmarks = "Text", comp_philosophy = "Text" }
+output      = "CompensationReport"
+steps = [
+    { pipe = "parallel_analysis", result = "analysis_results" },
+    { pipe = "compile_compensation_report", result = "compensation_report" },
+]
+
+[pipe.parallel_analysis]
+type        = "PipeParallel"
+description = "Run market positioning and pay equity analyses in parallel"
+inputs      = { employee_comp_data = "Text", market_benchmarks = "Text", comp_philosophy = "Text" }
+output      = "Anything"
+branches = [
+    { pipe = "analyze_market_position", result = "market_analysis" },
+    { pipe = "analyze_pay_equity", result = "pay_equity_analysis" },
+]
+add_each_output = true
+
+[pipe.analyze_market_position]
+type        = "PipeLLM"
+description = "Analyze internal compensation against market benchmarks"
+inputs      = { employee_comp_data = "Text", market_benchmarks = "Text", comp_philosophy = "Text" }
+output      = "MarketAnalysis"
+model       = "$writing-factual"
+prompt      = """You are a compensation analyst performing market benchmarking.
+
+Compare internal compensation data against market benchmarks for each role family:
+
+Per role family and level:
+1. Internal median compensation
+2. Market benchmarks: 25th, 50th, and 75th percentiles
+3. Market position: above market, at market, below market, or significantly below market
+4. Compa-ratio (internal pay / market midpoint)
+5. Number of employees in this band
+6. Number below band minimum and above band maximum
+
+Then identify:
+- Roles most at risk of attrition (below market AND high demand in the job market)
+- Recommended salary band adjustments based on the compensation philosophy (e.g., target 50th percentile vs. 75th)
+
+Apply the company's compensation philosophy to all assessments.
+
+--- COMPENSATION PHILOSOPHY ---
+@comp_philosophy
+
+--- EMPLOYEE COMPENSATION DATA ---
+@employee_comp_data
+
+--- MARKET BENCHMARKS ---
+@market_benchmarks"""
+
+[pipe.analyze_pay_equity]
+type        = "PipeLLM"
+description = "Analyze pay equity across demographic dimensions"
+inputs      = { employee_comp_data = "Text", comp_philosophy = "Text" }
+output      = "PayEquityAnalysis"
+model       = "$writing-factual"
+prompt      = """You are a compensation analyst performing a pay equity analysis.
+
+Analyze the employee compensation data for pay equity across available demographic dimensions (gender, ethnicity, or other dimensions if provided).
+
+For each demographic dimension:
+1. Compare median compa-ratios between groups
+2. Flag statistical significance: significant gap, marginal, or no gap
+3. Identify affected roles and levels where gaps are most pronounced
+4. Estimate the cost to close each significant gap
+
+Document the methodology used (e.g., compa-ratio comparison, controlled vs. uncontrolled analysis).
+
+Focus on identifying systemic patterns rather than individual outliers.
+
+--- COMPENSATION PHILOSOPHY ---
+@comp_philosophy
+
+--- EMPLOYEE COMPENSATION DATA ---
+@employee_comp_data"""
+
+[pipe.compile_compensation_report]
+type        = "PipeLLM"
+description = "Compile market and equity analyses into a comprehensive compensation report"
+inputs      = { market_analysis = "MarketAnalysis", pay_equity_analysis = "PayEquityAnalysis", comp_philosophy = "Text" }
+output      = "CompensationReport"
+model       = "$writing-factual"
+prompt      = """You are the VP of Total Rewards compiling a compensation report for the CHRO and CFO.
+
+Synthesize the market analysis and pay equity analysis:
+
+1. Overall market competitiveness: leading, competitive, lagging, or at risk.
+2. List roles most at risk of attrition (below market + high demand).
+3. Summarize pay equity findings — highlight statistically significant gaps.
+4. Recommend band adjustments with rationale.
+5. Calculate total estimated budget impact of all recommended adjustments (band changes + equity fixes).
+6. Write an executive summary that gives the CHRO and CFO a clear picture: where we stand, where we're exposed, what it costs to fix, and what happens if we don't.
+
+--- COMPENSATION PHILOSOPHY ---
+@comp_philosophy
+
+--- MARKET ANALYSIS ---
+@market_analysis
+
+--- PAY EQUITY ANALYSIS ---
+@pay_equity_analysis"""

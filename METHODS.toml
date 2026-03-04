@@ -1,0 +1,12 @@
+[package]
+name = "hr_comp_benchmarker"
+address = "github.com/RobinHrt/mthds-hr-compensation-benchmarker"
+display_name = "HR Compensation Benchmarker"
+version = "1.0.0"
+description = "Analyze compensation against market benchmarks and pay equity"
+license = "MIT"
+mthds_version = ">=1.0.0"
+main_pipe = "compensation_benchmarking"
+
+[exports.hr_compensation_benchmarker]
+pipes = ["compensation_benchmarking", "parallel_analysis", "analyze_market_position", "analyze_pay_equity", "compile_compensation_report"]
