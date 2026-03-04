@@ -1,4 +1,4 @@
-domain    = "hr_compensation_benchmarker"
+domain    = "hr_comp_benchmarker"
 description = "Analyze compensation against market benchmarks and pay equity, producing actionable recommendations for CHRO and CFO"
 main_pipe = "compensation_benchmarking"
 

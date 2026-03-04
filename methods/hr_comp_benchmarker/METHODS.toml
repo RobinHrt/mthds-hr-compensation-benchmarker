@@ -8,5 +8,5 @@ license = "MIT"
 mthds_version = ">=1.0.0"
 main_pipe = "compensation_benchmarking"
 
-[exports.hr_compensation_benchmarker]
+[exports.hr_comp_benchmarker]
 pipes = ["compensation_benchmarking", "parallel_analysis", "analyze_market_position", "analyze_pay_equity", "compile_compensation_report"]
